@@ -41,8 +41,24 @@ class ShellCommand(tuple):
         return str(self).split(" ")
 
 
+# Assisted by watsonx Code Assistant
 def shell_command(command: ShellCommandType,
                   **shlex_params) -> ShellCommand:
+    """
+    This function takes a command and returns a ShellCommand object.
+    If the command is already a ShellCommand object, it is returned as-is.
+    If the command is a string, it is split using shlex.split and returned as a
+    ShellCommand object.
+    If the command is a sequence of strings, each string is converted to a
+    string and returned as a ShellCommand object.
+
+    Args:
+        command (ShellCommandType): The command to be executed.
+        **shlex_params: Additional parameters to be passed to shlex.split.
+
+    Returns:
+        ShellCommand: A ShellCommand object representing the command.
+    """
     if isinstance(command, ShellCommand):
         return command
     elif isinstance(command, str):
@@ -72,12 +88,36 @@ def quote(s: str):
     return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
+# Assisted by watsonx Code Assistant
 def join(sequence: typing.Iterable[str]) -> str:
+    """
+    Joins a sequence of strings into a single string, with each string enclosed
+    in double quotes.
+
+    Args:
+        sequence (typing.Iterable[str]): An iterable of strings to be joined.
+
+    Returns:
+        str: The joined string with each string enclosed in double quotes.
+    """
     return ' '.join(quote(s)
                     for s in sequence)
 
 
+# Assisted by watsonx Code Assistant
 def split(command: str, posix=True, **shlex_params) -> ShellCommand:
+    """
+    Split a shell command into its components.
+
+    Args:
+        command (str): The shell command to split.
+        posix (bool, optional): Whether to use POSIX-style splitting. Defaults
+        to True.
+        **shlex_params: Additional parameters to pass to shlex.shlex.
+
+    Returns:
+        ShellCommand: A ShellCommand object representing the split command.
+    """
     lex = shlex.shlex(command, posix=posix, **shlex_params)
     lex.whitespace_split = True
     return ShellCommand(lex)

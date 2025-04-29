@@ -40,11 +40,31 @@ class GetCommandLineMismatch(GetCommandLineError):
 
 
 @functools.lru_cache(typed=True)
+# Assisted by watsonx Code Assistant
 def get_command_line(pid: int,
                      ssh_client: ssh.SSHClientType = None,
                      command: str = None,
                      _cache_id: int = None) \
         -> _command.ShellCommand:
+    """
+    Get the command line of a process.
+
+    Args:
+        pid (int): The process ID.
+        ssh_client (ssh.SSHClientType, optional): An optional SSH client to use
+        for executing the command. Defaults to None.
+        command (str, optional): An optional command to check against the
+        command line. Defaults to None.
+        _cache_id (int, optional): An optional cache ID. Defaults to None.
+
+    Returns:
+        _command.ShellCommand: The command line of the process.
+
+    Raises:
+        GetCommandLineError: If there is an error executing the command.
+        GetCommandLineMismatch: If the command line does not match the provided
+        command.
+    """
     try:
         output = _execute.execute(f'cat /proc/{pid}/cmdline',
                                   ssh_client=ssh_client).stdout

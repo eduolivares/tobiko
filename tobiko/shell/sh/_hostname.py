@@ -36,10 +36,26 @@ HOSTNAMES_FQDN_CACHE: \
                           str] = weakref.WeakKeyDictionary()
 
 
+# Assisted by watsonx Code Assistant
 def get_hostname(ssh_client: ssh.SSHClientType = None,
                  cached=True,
                  fqdn=False,
                  **execute_params) -> str:
+    """
+    Get the hostname of the SSH client.
+
+    Args:
+        ssh_client (ssh.SSHClientType): The SSH client to get the hostname
+        from.
+        cached (bool): Whether to cache the hostname. Defaults to True.
+        fqdn (bool): Whether to return the fully qualified domain name.
+        Defaults to False.
+        **execute_params: Additional parameters to pass to the ssh_hostname
+        function.
+
+    Returns:
+        str: The hostname of the SSH client.
+    """
     ssh_client = ssh.ssh_client_fixture(ssh_client)
     if ssh_client is None:
         return socket.gethostname()
@@ -66,10 +82,23 @@ def get_hostname(ssh_client: ssh.SSHClientType = None,
     return hostname
 
 
+# Assisted by watsonx Code Assistant
 def ssh_hostname(ssh_client: ssh.SSHClientFixture,
                  fqdn=False,
                  **execute_params) \
         -> str:
+    """Return the hostname of the SSH client.
+
+    :param ssh_client: The SSH client to use
+    :type ssh_client: ssh.SSHClientFixture
+    :param fqdn: Return the fully qualified domain name (FQDN)
+    :type fqdn: bool
+    :param execute_params: Additional parameters to pass to the execute
+    function
+    :type execute_params: dict
+    :return: The hostname of the SSH client
+    :rtype: str
+    """
     tobiko.check_valid_type(ssh_client, ssh.SSHClientFixture)
     command = 'hostname'
     if fqdn:
