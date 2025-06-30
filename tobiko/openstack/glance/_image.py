@@ -418,11 +418,6 @@ class InvalidGlanceImageStatus(tobiko.TobikoException):
                "{actual_status!r} not in {expected_status!r}")
 
 
-class GlanceImageCreationFailed(tobiko.TobikoException):
-    message = ("Failed creating image {image_name!r}: status "
-               "({observed!r}) not in ({expected!r})")
-
-
 CHANGING_STATUS = {GlanceImageStatus.QUEUED,
                    GlanceImageStatus.IMPORTING,
                    GlanceImageStatus.PENDING_DELETE,
