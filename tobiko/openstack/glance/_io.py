@@ -13,14 +13,9 @@
 #    under the License.
 from __future__ import absolute_import
 
-import bz2
-import gzip
 import io
-import zipfile
 
 from oslo_log import log
-
-from tobiko.openstack.glance import _lzma
 
 
 LOG = log.getLogger(__name__)
@@ -31,34 +26,6 @@ COMPRESSED_FILE_TYPES = {}
 def comressed_file_type(cls):
     COMPRESSED_FILE_TYPES[cls.compression_type] = cls
     return cls
-
-
-@comressed_file_type
-class BZ2FileType(object):
-    file_magic = b'\x42\x5a\x68'
-    compression_type = 'bz2'
-    open_file = bz2.BZ2File
-
-
-@comressed_file_type
-class GzipFileType(gzip.GzipFile):
-    file_magic = b'\x1f\x8b\x08'
-    compression_type = 'gz'
-    open_file = gzip.GzipFile
-
-
-@comressed_file_type
-class XzFileType(object):
-    file_magic = b'\xfd7zXZ\x00'
-    compression_type = 'xz'
-    open_file = staticmethod(_lzma.open_file)
-
-
-@comressed_file_type
-class ZipFileType(object):
-    file_magic = b'\x50\x4b\x03\x04'
-    compression_type = 'zip'
-    open_file = zipfile.ZipFile
 
 
 def open_image_file(filename, mode, compression_type=None):
