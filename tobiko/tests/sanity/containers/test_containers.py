@@ -17,12 +17,10 @@ from __future__ import absolute_import
 
 import functools
 import os
-import time
 
+import pytest
 import testtools
 from oslo_log import log
-import pandas
-import pytest
 
 import tobiko
 from tobiko.openstack import neutron
@@ -33,6 +31,7 @@ from tobiko.rhosp import containers as rhosp_containers
 from tobiko.shell import sh
 from tobiko import tripleo
 from tobiko.tripleo import containers as tripleo_containers
+from tobiko.tripleo import overcloud
 
 
 LOG = log.getLogger(__name__)
@@ -215,11 +214,11 @@ class TripleoContainersHealthTest(BaseContainersHealtTest):
         """compare all overcloud container states with using two lists:
         one is current , the other some past list
         first time this method runs it creates a file holding overcloud
-        containers' states: ~/expected_containers_list_df.csv'
+        containers' states: ~/expected_containers_td.csv'
         second time it creates a current containers states list and
         compares them, they must be identical"""
 
-        expected_containers_list_df = []
+        expected_containers_td = []
         # if we have a file or an explicit variable use that ,
         # otherwise  create and return
         if recreate_expected or (not (expected_containers_list or
@@ -230,46 +229,42 @@ class TripleoContainersHealthTest(BaseContainersHealtTest):
                 tripleo_containers.list_containers())
             return
         elif expected_containers_list:
-            expected_containers_list_df = pandas.DataFrame(
+            expected_containers_td = tobiko.TableData(
                 tripleo_containers.get_container_states_list(
                     expected_containers_list),
                 columns=['container_host', 'container_name',
                          'container_state'])
         elif os.path.exists(rhosp_containers.expected_containers_file):
-            expected_containers_list_df = pandas.read_csv(
+            expected_containers_td = tobiko.TableData.read_csv(
                 rhosp_containers.expected_containers_file)
-        failures = []
+
         error_info = 'Output explanation: left_only is the original state, ' \
                      'right_only is the new state'
-        for _ in tobiko.retry(timeout=timeout):
-            failures = []
-            actual_containers_list_df = tripleo_containers.list_containers_df()
-            LOG.info('expected_containers_list_df: {} '.format(
-                expected_containers_list_df.to_string(index=False)))
-            LOG.info('actual_containers_list_df: {} '.format(
-                actual_containers_list_df.to_string(index=False)))
+        for attempt in tobiko.retry(timeout=timeout, interval=interval):
+            actual_containers_td = tripleo_containers.list_containers_td()
+            LOG.info('expected_containers_td: '
+                     f'{expected_containers_td}')
+            LOG.info(f'actual_containers_td: {actual_containers_td}')
             # execute a `dataframe` diff between the expected
             # and actual containers
             expected_containers_state_changed = \
-                rhosp_containers.dataframe_difference(
-                    expected_containers_list_df, actual_containers_list_df)
+                rhosp_containers.tabledata_difference(
+                    expected_containers_td, actual_containers_td)
             # check for changed state containerstopology
-            if not expected_containers_state_changed.empty:
-                failures.append('expected containers changed state ! : '
-                                '\n\n{}\n{}'.format(
-                                 expected_containers_state_changed.
-                                 to_string(index=False), error_info))
-                LOG.info('container states mismatched:\n{}\n'.format(failures))
-                time.sleep(interval)
-                # clear cache to obtain new data
-                tripleo_containers.list_node_containers.cache_clear()
-            else:
+            if expected_containers_state_changed.empty:
                 LOG.info("assert_equal_containers_state :"
                          " OK, all containers are on the same state")
                 return
-        if failures:
-            tobiko.fail('container states mismatched:\n{!s}', '\n'.join(
-                failures))
+
+            if attempt.is_last:
+                tobiko.fail('expected containers changed state ! :\n'
+                            f'{expected_containers_state_changed}\n'
+                            f'{error_info}')
+
+            LOG.info('container states mismatched:\n'
+                     f'{expected_containers_state_changed}')
+            # clear cache to obtain new data
+            tripleo_containers.list_node_containers.cache_clear()
 
     def config_validation(self, config_checkings):
         container_runtime_name = tripleo_containers.\
@@ -357,11 +352,11 @@ class PodifiedContainersHealthTest(BaseContainersHealtTest):
         """compare all overcloud container states with using two lists:
         one is current , the other some past list
         first time this method runs it creates a file holding overcloud
-        containers' states: ~/expected_containers_list_df.csv'
+        containers' states: ~/expected_containers_td.csv'
         second time it creates a current containers states list and
         compares them, they must be identical"""
 
-        expected_containers_list_df = []
+        expected_containers_td = []
         # if we have a file or an explicit variable use that ,
         # otherwise  create and return
         if recreate_expected or (not (expected_containers_list or
@@ -372,44 +367,219 @@ class PodifiedContainersHealthTest(BaseContainersHealtTest):
                 podified_containers.list_containers())
             return
         elif expected_containers_list:
-            expected_containers_list_df = pandas.DataFrame(
+            expected_containers_td = tobiko.TableData(
                 podified_containers.get_container_states_list(
                     expected_containers_list),
                 columns=['container_host', 'container_name',
                          'container_state'])
         elif os.path.exists(rhosp_containers.expected_containers_file):
-            expected_containers_list_df = pandas.read_csv(
+            expected_containers_td = tobiko.TableData.read_csv(
                 rhosp_containers.expected_containers_file)
-        failures = []
         error_info = 'Output explanation: left_only is the original state, ' \
                      'right_only is the new state'
-        for _ in tobiko.retry(timeout=timeout):
-            failures = []
-            actual_containers_list_df = \
-                podified_containers.list_containers_df()
-            LOG.info('expected_containers_list_df: {} '.format(
-                expected_containers_list_df.to_string(index=False)))
-            LOG.info('actual_containers_list_df: {} '.format(
-                actual_containers_list_df.to_string(index=False)))
+        for attempt in tobiko.retry(timeout=timeout, interval=interval):
+            actual_containers_td = \
+                podified_containers.list_containers_td()
+            LOG.info('expected_containers_td: {} '.format(
+                expected_containers_td.to_string()))
+            LOG.info('actual_containers_td: {} '.format(
+                actual_containers_td.to_string()))
             # execute a `dataframe` diff between the expected
             # and actual containers
             expected_containers_state_changed = \
-                rhosp_containers.dataframe_difference(
-                    expected_containers_list_df, actual_containers_list_df)
+                rhosp_containers.tabledata_difference(
+                    expected_containers_td, actual_containers_td)
             # check for changed state containerstopology
-            if not expected_containers_state_changed.empty:
-                failures.append('expected containers changed state ! : '
-                                '\n\n{}\n{}'.format(
-                                 expected_containers_state_changed.
-                                 to_string(index=False), error_info))
-                LOG.info('container states mismatched:\n{}\n'.format(failures))
-                time.sleep(interval)
-                # clear cache to obtain new data
-                podified_containers.list_node_containers.cache_clear()
-            else:
+            if expected_containers_state_changed.empty:
                 LOG.info("assert_equal_containers_state :"
                          " OK, all containers are on the same state")
                 return
-        if failures:
-            tobiko.fail('container states mismatched:\n{!s}', '\n'.join(
-                failures))
+
+            if attempt.is_last:
+                tobiko.fail('expected containers changed state ! :\n'
+                            f'{expected_containers_state_changed}\n'
+                            f'{error_info}')
+
+            LOG.info('container states mismatched:\n'
+                     f'{expected_containers_state_changed}')
+            # clear cache to obtain new data
+            podified_containers.list_node_containers.cache_clear()
+
+
+class GenericContainersTest(testtools.TestCase):
+
+    def test_overcloud_containers_running(self):
+        """check that all containers are in running state"""
+        failures = tripleo_containers.list_containers_td()
+        if not failures.empty:
+            tripleo_containers.assert_all_tripleo_containers_running()
+
+    def test_containers_state_matches_expected(self):
+        """check that containers states match a previously
+        snapshotted state"""
+        tripleo_containers.assert_equal_containers_state()
+
+    def test_list_containers_from_podman_cmd(self):
+        """check podman containers list
+        list containers in running state from compute node"""
+        for node in topology.list_openstack_nodes(group='compute'):
+            containers_list = tripleo_containers.list_node_containers(
+                ssh_client=node.ssh_client)
+            self.assertGreater(len(containers_list), 5)
+            for container in containers_list:
+                self.assertIn("running", container.status)
+
+    def test_list_containers_from_docker_cmd(self):
+        """check docker containers list
+        list containers in running state from any node"""
+        all_nodes = topology.list_openstack_nodes()
+        if all_nodes:
+            containers_list = \
+                    tripleo_containers.list_node_containers(
+                        ssh_client=all_nodes[0].ssh_client)
+            self.assertGreater(len(containers_list), 0)
+            for container in containers_list:
+                self.assertIn("running", container.status)
+
+    def test_list_container_objects_df(self):
+        """check containers list with container objects
+        list containers in running state from overcloud nodes"""
+        containers_list_df = tripleo_containers.list_containers_objects_df()
+        if not containers_list_df.empty:
+            for _, container in enumerate(containers_list_df):
+                self.assertIsNotNone(container['container_object'])
+
+    def test_get_container_states_list(self):
+        """check the containers states is returning the proper values"""
+        containers_list = tripleo_containers.list_containers()
+        containers_states_list = tripleo_containers.get_container_states_list(
+            containers_list)
+        self.assertGreater(len(containers_states_list), 0)
+
+    def test_ovn_containers_state_check(self):
+        """check that ovn containers are running with correct state"""
+        if not neutron.has_ovn():
+            tobiko.skip('This test requires ovn environment')
+        else:
+            tripleo_containers.assert_ovn_containers_running()
+
+
+class ContainerCreationTest(testtools.TestCase):
+
+    def test_save_containers_state_to_file(self):
+        """save containers states to a file for later comparison"""
+
+        containers_list = tripleo_containers.list_containers()
+        tripleo_containers.save_containers_state_to_file(containers_list)
+        # compare the file content and the content that should be written
+        # we mock the expected_containers_file path changing the file
+        # location from home folder to /tmp/
+        saved_file_content = tripleo_containers.get_container_states_list(
+            containers_list)
+        expected_saved_file_content = \
+            tripleo_containers.get_container_states_list(containers_list)
+        self.assertEqual(expected_saved_file_content, saved_file_content)
+
+    def test_containers_state_in_csv_format(self):
+        """check containers state can be stored in a csv format file
+        steps:
+        1- Create file
+        2- Check the file exists and contains expected data"""
+        # create file
+        containers_list = tripleo_containers.list_containers()
+        expected_container_list_df = tobiko.TableData(
+            tripleo_containers.get_container_states_list(containers_list),
+            columns=['container_host', 'container_name', 'container_state'])
+
+        # check the created file exists and contains data
+        self.assertGreater(len(expected_container_list_df), 0)
+        for container in expected_container_list_df:
+            # add additional columns
+            self.assertIsNotNone(container.get('container_host'))
+            self.assertIsNotNone(container.get('container_state'))
+            self.assertIsNotNone(container.get('container_name'))
+
+    @tobiko.skip_unless('TripleO overcloud required', overcloud.has_overcloud)
+    def test_containers_logs_are_being_stored(self):
+        """Check the containers logs are being stored
+        - for each container, check logs file is being
+          updated"""
+        container_runtime_name = \
+            tripleo_containers.get_container_runtime_name()
+        if not container_runtime_name:
+            tobiko.skip('No container runtime available')
+
+        expected_containers_td = tobiko.TableData(
+            tripleo_containers.get_container_states_list(
+                tripleo_containers.list_containers()),
+            columns=['container_host', 'container_name', 'container_state'])
+
+        containers_without_logs_gen = []
+        for container in expected_containers_td:
+            container_name = container['container_name']
+            if container_name.startswith('/'):
+                container_name = container_name[1:]
+
+            if container_runtime_name == 'podman':
+                log_path = f'/var/log/containers/stdouts/{container_name}.log'
+            else:
+                log_path = ('/var/lib/docker/containers/'
+                            f'{container_name}/'
+                            f'{container_name}-json.log')
+
+            container_host = container['container_host']
+            ssh_client = overcloud.overcloud_ssh_client(
+                                instance=overcloud.find_overcloud_node(
+                                          name=container_host))
+            try:
+                log_file_stat = sh.execute('stat {}'.format(log_path),
+                                           ssh_client=ssh_client,
+                                           check=False)
+            except sh.ShellCommandFailed:
+                containers_without_logs_gen.append(container_name)
+                LOG.warning(f'Container {container_name} has no log '
+                            f'file at expected location: {log_path}')
+                continue
+
+            # check the log file is bigger then 0 bytes
+            # this is just a fast check to see that the container
+            # is logging something
+            if 'Size: 0' in log_file_stat.stdout:
+                containers_without_logs_gen.append(container_name)
+
+        # check a minority of containers in the logs without logs, this is
+        # because some contrainers don't generate logs
+        self.assertLess(len(containers_without_logs_gen),
+                        len(expected_containers_td) / 4)
+
+    def test_containers_logs_contain_entries(self):
+        """Check  containers logs contain entries"""
+        if not overcloud.has_overcloud():
+            tobiko.skip('TripleO overcloud required')
+
+        expected_containers_td = tobiko.TableData(
+            tripleo_containers.get_container_states_list(
+                tripleo_containers.list_containers()),
+            columns=['container_host', 'container_name', 'container_state'])
+
+        containers_with_empty_logs = []
+        for container in expected_containers_td:
+            container_host = container['container_host']
+            container_name = container['container_name']
+
+            if container_name.startswith('/'):
+                container_name = container_name[1:]
+
+            container_id = container_name
+            node = overcloud.find_overcloud_node(name=container_host)
+            ssh_client = overcloud.overcloud_ssh_client(instance=node)
+            logs_result = sh.execute(
+                f'{tripleo_containers.get_container_runtime_name()} logs'
+                f' --tail=5 {container_id}',
+                ssh_client=ssh_client, check=False)
+            if not logs_result.stdout.strip():
+                containers_with_empty_logs.append(container_name)
+
+        # Less than 1/4 of containers should have empty logs
+        self.assertLess(len(containers_with_empty_logs),
+                        len(expected_containers_td) / 4)

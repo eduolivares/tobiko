@@ -5,7 +5,6 @@ import io
 import time
 
 from oslo_log import log
-import pandas
 
 import tobiko
 from tobiko import config
@@ -27,7 +26,7 @@ class PcsResourceException(tobiko.TobikoException):
     message = "pcs cluster is not in a healthy state"
 
 
-def get_pcs_resources_table(timeout=720, interval=2) -> pandas.DataFrame:
+def get_pcs_resources_table(timeout=720, interval=2) -> tobiko.TableData:
     """
     get pcs status from a controller and parse it
     to have it's resources states in check
@@ -38,7 +37,7 @@ def get_pcs_resources_table(timeout=720, interval=2) -> pandas.DataFrame:
        openstack-cinder-volume-podman-0     (ocf::heartbeat:podman):        Sta
        rted controller-0
 
-    :return: dataframe of pcs resources stats table
+    :return: TableData of pcs resources stats table
     """
     # prevent pcs table read failure while pacemaker is starting
     for attempt in tobiko.retry(timeout=timeout,
@@ -48,7 +47,7 @@ def get_pcs_resources_table(timeout=720, interval=2) -> pandas.DataFrame:
             # remove the first column when it only includes '*' characters
             output = output.replace('*', '').strip()
             stream = io.StringIO(output)
-            table: pandas.DataFrame = pandas.read_csv(
+            table = tobiko.TableData.read_csv(
                 stream, delim_whitespace=True, header=None)
             table.columns = ['resource', 'resource_type', 'resource_state',
                              'overcloud_node']
@@ -87,19 +86,19 @@ class PacemakerResourcesStatus(object):
 
     def container_runtime(self):
 
-        if not self.pcs_df[(self.pcs_df['resource_type'] ==
-                            f"({self.ocf_prefix}heartbeat:podman):")].empty:
+        if not self.pcs_df.query(
+                'resource_type == '
+                f'"({self.ocf_prefix}heartbeat:podman):"').empty:
             return 'podman'
 
     def resource_count(self, resource_type):
-        return self.pcs_df[(self.pcs_df['resource_type'] == resource_type)][
-            'resource_state'].count()
+        return self.pcs_df.query(
+            f'resource_type == "{resource_type}"')['resource_state'].count()
 
     def resource_count_in_state(self, resource_type, resource_state):
-        return self.pcs_df[(self.pcs_df['resource_type'] ==
-                            resource_type) & (self.pcs_df['resource_state'] ==
-                                              resource_state)][
-            'resource_state'].count()
+        return self.pcs_df.query(
+            f'resource_type == "{resource_type}" and '
+            f'resource_state == "{resource_state}"')['resource_state'].count()
 
     def rabbitmq_resource_healthy(self):
         rabbitmq_resource_str = \

@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import typing
 
 from oslo_log import log
-import pandas
 
 import tobiko
 from tobiko.tripleo import overcloud
@@ -34,7 +33,7 @@ cloud-final.service|loaded|active|exited|Executeclouduser/finalscripts
 cloud-init-local.service|loaded|active|exited|Initialcloud-initjob(pre-network)
 cloud-init.service|loaded|active|exited|Initialcloud-initjob(metadataservicecr)
 
-    :return: dataframe of overcloud node services
+    :return: TableData of overcloud node services
     """
     units = sh.list_systemd_units(all=True,
                                   ssh_client=ssh_client).without_attributes(
@@ -51,9 +50,12 @@ cloud-init.service|loaded|active|exited|Initialcloud-initjob(metadataservicecr)
         data['active_state'].append(unit.active)
         data['low_level_state'].append(unit.sub)
         data['UNIT_DESCRIPTION'].append(unit.description)
-    table = pandas.DataFrame.from_dict(data)
+    table = tobiko.TableData.from_dict(data)
     table.replace(to_replace=' ', value="", regex=True, inplace=True)
-    table['overcloud_node'] = sh.get_hostname(ssh_client=ssh_client)
+    # Add hostname to each row
+    hostname = sh.get_hostname(ssh_client=ssh_client)
+    for row in table:
+        row['overcloud_node'] = hostname
 
     LOG.debug("Got overcloud nodes services status :\n%s", table)
     return table
@@ -68,12 +70,12 @@ def get_overcloud_nodes_running_service(service):
     oc_procs_df = overcloud.get_overcloud_nodes_dataframe(
                                             get_overcloud_node_services_table)
     # remove the ".service" suffix
-    oc_procs_df = oc_procs_df.replace(to_replace={'UNIT': '.service'},
-                                      value='',
-                                      regex=True)
-    oc_nodes_running_service = oc_procs_df.query('UNIT=="{}"'.format(service))[
-                                                'overcloud_node'].unique()
-    return oc_nodes_running_service.tolist()
+    oc_procs_df.replace(to_replace={'UNIT': '.service'},
+                        value='',
+                        regex=True, inplace=True)
+    oc_nodes_running_service = oc_procs_df.query(
+        'UNIT=="{}"'.format(service))['overcloud_node'].unique()
+    return oc_nodes_running_service
 
 
 class OvercloudServicesStatus(tobiko.SharedFixture):

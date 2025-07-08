@@ -254,20 +254,19 @@ def get_overcloud_nodes_dataframe(
                                              typing.Any]):
     """
      :param oc_node_df_function : a function that queries a oc node
-     using a cli command and returns a datraframe with an added
+     using a cli command and returns a TableData with an added
      hostname field.
 
-     This function concats oc nodes dataframes into a unified overcloud
-     dataframe, seperated by hostname field
+     This function concats oc nodes TableData into a unified overcloud
+     TableData, seperated by hostname field
 
-    :return: dataframe of all overcloud nodes processes
+    :return: TableData of all overcloud nodes processes
     """
-    import pandas
     oc_nodes_dfs = list()
     for instance in list_overcloud_nodes():
         ssh_client = overcloud_ssh_client(instance=instance)
         oc_nodes_dfs.append(oc_node_df_function(ssh_client))
-    oc_procs_df = pandas.concat(oc_nodes_dfs, ignore_index=True)
+    oc_procs_df = tobiko.concat(oc_nodes_dfs)
     return oc_procs_df
 
 

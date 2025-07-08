@@ -150,6 +150,7 @@ skip_unless = _skip.skip_unless
 skip = _skip.skip
 
 TableData = _tabledata.TableData
+concat = _tabledata.concat
 
 min_seconds = _time.min_seconds
 max_seconds = _time.max_seconds
